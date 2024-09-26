@@ -16,8 +16,8 @@
 <version>
 	<application>signposting</application>
 	<type>plugins.generic</type>
-	<release>1.0.0.0</release>
-	<date>2018-03-05</date>
+	<release>3.4.0.0</release>
+	<date>2024-09-26</date>
 	<lazy-load>1</lazy-load>
 	<class>SignpostingPlugin</class>
 </version>

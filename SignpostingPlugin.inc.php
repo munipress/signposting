@@ -26,15 +26,15 @@ define('SIGNPOSTING_MAX_LINKS', 10);
 class SignpostingPlugin extends GenericPlugin {
 
 	protected $_landingPageConfig = Array('author',
-										  'bibliographic metadata',
-										  'identifier',
-										  'publication boundary');
+                                            'bibliographic metadata',
+                                            'identifier',
+                                            'publication boundary');
 
-	protected $_biblioConfig	  = Array('bibliographic metadata');
+	protected $_biblioConfig = Array('bibliographic metadata');
 
-	protected $_boundariesConfig  = Array('publication boundary');
+	protected $_boundariesConfig = Array('publication boundary');
 	
-	protected $_citationFormats   = Array();
+	protected $_citationFormats = Array();
 
 	/**
 	 * Called as a plugin is registered to the registry
@@ -73,12 +73,14 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param $sourceFile
 	 */
 	public function dispatcher($page, $op) {
-		$request	= Application::getRequest();
+                error_log(print_r($page,true));
+                error_log(print_r($op,true));
+                $request = Application::get()->getRequest();
 		$articleDao = DAORegistry::getDAO('SubmissionDAO');
-		$issueDao	= DAORegistry::getDAO('IssueDAO');
-		$journal	= $request->getJournal();
-		$args		= $request->getRequestedArgs();
-		$params     = $request->getQueryArray();
+		$issueDao = DAORegistry::getDAO('IssueDAO');
+		$context = $request->getContext();
+		$args = $request->getRequestedArgs();
+		$params = $request->getQueryArray();
 		$returnTrue = false;
 		$returnHead = false;
 		$mode		= false;
@@ -130,7 +132,7 @@ class SignpostingPlugin extends GenericPlugin {
 			$this->buildHeaders($headers,
 								$configVarName,
 								$patternMode,
-								$journal,
+								$context,
 								$article);
 		}
 		if (count($headers) > SIGNPOSTING_MAX_LINKS) {
@@ -212,10 +214,10 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param Array $headers
 	 * @param string $configVarName
 	 * @param string $patternMode
-	 * @param object $journal
+	 * @param object $context
 	 * @param object $article
 	 */
-	public function buildHeaders(&$headers, $configVarName, $patternMode, $journal, $article) {
+	public function buildHeaders(&$headers, $configVarName, $patternMode, $context, $article) {
 		foreach ($this->$configVarName as $pattern) {
 			switch ($pattern) {
 				case 'author':
@@ -223,16 +225,16 @@ class SignpostingPlugin extends GenericPlugin {
 					 break;
 				case 'bibliographic metadata':
 					 $this->_bibliographicMetadataPattern($headers,
-														  $journal,
+														  $context,
 														  $article,
 														  $patternMode);
 					 break;
 				case 'identifier':
-					 $this->_identifierPattern($headers, $journal, $article);
+					 $this->_identifierPattern($headers, $context, $article);
 					 break;
 				case 'publication boundary':
 					 $this->_publicationBoundary($headers,
-												 $journal,
+												 $context,
 												 $article,
 												 $patternMode);
 					 break;
@@ -261,8 +263,8 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param object $article
 	 * @param string $mode
 	 */
-	protected function _bibliographicMetadataPattern(&$headers, $journal, $article, $mode) {
-		$request = Application::getRequest();
+	protected function _bibliographicMetadataPattern(&$headers, $context, $article, $mode) {
+                $request = Application::get()->getRequest();
 		if ($mode == 'toItem') {
 			$rel = 'describedby';
 		    $citationFormats = $this->_getCitationFormats();
@@ -275,7 +277,7 @@ class SignpostingPlugin extends GenericPlugin {
 			$pubIdPlugin = PluginRegistry::loadPlugin('pubIds', 'doi');
 			$pubId = $pubIdPlugin->getPubId($article);
 			if (!empty($pubId)) {
-				$headers[] = Array('value' => $pubIdPlugin->getResolvingURL($journal->getId(), $pubId),
+				$headers[] = Array('value' => $pubIdPlugin->getResolvingURL($context->getId(), $pubId),
 								   'rel'   => $rel,
 								   'type'  => 'application/vnd.citationstyles.csl+json');
 			}
@@ -290,15 +292,15 @@ class SignpostingPlugin extends GenericPlugin {
 	/**
 	 * Signposting Identifier pattern implementation
 	 * @param Array $headers
-	 * @param object $journal
+	 * @param object $context
 	 * @param object $article
 	 */
-	protected function _identifierPattern(&$headers, $journal, $article) {
+	protected function _identifierPattern(&$headers, $context, $article) {
 		$pubIdPlugins = PluginRegistry::loadCategory('pubIds', true);
 		foreach ($pubIdPlugins as $pubIdPlugin) {
 			$pubId = $pubIdPlugin->getPubId($article);
 			if (!empty($pubId)) {
-				$headers[] = Array('value' => $pubIdPlugin->getResolvingURL($journal->getId(), $pubId),
+				$headers[] = Array('value' => $pubIdPlugin->getResolvingURL($context->getId(), $pubId),
 								   'rel'   => 'cite-as');
 			}
 		}
@@ -307,19 +309,19 @@ class SignpostingPlugin extends GenericPlugin {
 	/**
 	 * Signposting Publication Boundary pattern implementation
 	 * @param Array $headers
-	 * @param object $journal
+	 * @param object $context
 	 * @param object $article
 	 * @param string $mode
 	 */
-	protected function _publicationBoundary(&$headers, $journal, $article, $mode) {
-		$request = Application::getRequest();
-		$articleId = $article->getBestArticleId($journal);
+	protected function _publicationBoundary(&$headers, $context, $article, $mode) {
+                $request = Application::get()->getRequest();
+		$articleId = $article->getBestArticleId($context);
 		if ($mode == 'toItem') {
 			$rel = 'item';
 			foreach ($article->getGalleys() as $galley) {
 				$link = $request->url(null, 'article', 'download',
 									 Array($article->getId(),
-										   $galley->getBestGalleyId($journal)));
+										   $galley->getBestGalleyId($context)));
 				$mimeType = $galley->getFileType();
 				$headers[] = Array('value' => $link,
 								   'rel'   => $rel,

@@ -47,7 +47,7 @@ class SignpostingCitationHandler extends Handler {
 		$citationFormats = $this->_getCitationFormats();
 		if (isset($citationFormats[$format])) {
 			$templateMgr = TemplateManager::getManager();
-			$request = Application::getRequest();
+			$request = Application::get()->getRequest();
 			$articleDao  = DAORegistry::getDAO('SubmissionDAO');
 			$issueDao	 = DAORegistry::getDAO('IssueDAO');
 			$journal	 = $request->getJournal();

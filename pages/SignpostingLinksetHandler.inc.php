@@ -55,7 +55,7 @@ class SignpostingLinksetHandler extends Handler {
 	 */
 	protected function _outputLinkset($args, $request, $mode) {
 		$headers	= Array();
-		$request = Application::getRequest();
+		$request = Application::get()->getRequest();
 		$articleDao = DAORegistry::getDAO('SubmissionDAO');
 		$issueDao	= DAORegistry::getDAO('IssueDAO');
 		$journal	= $request->getJournal();
@@ -97,7 +97,7 @@ class SignpostingLinksetHandler extends Handler {
 	 */
 	protected function _getAnchor($mode, $articleId, $plugin) {
 		$output = Array();
-		$request = Application::getRequest();
+		$request = Application::get()->getRequest();
 		switch ($mode) {
 			case 'article' : $output = $request->url(null, 'article', 'view', $articleId);
 							 break;
