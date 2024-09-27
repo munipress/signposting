@@ -16,7 +16,16 @@
  * @brief Signposting linkset handler
  */
 
-import('classes.handler.Handler');
+use APP\core\Application;
+use APP\facades\Repo;
+use PKP\core\PKPString;
+use PKP\facades\Locale;
+use PKP\plugins\PluginRegistry;
+use PKP\plugins\Hook;
+use PKP\db\DAORegistry;
+use PKP\submissionFile\SubmissionFile;
+use APP\plugins\generic\citationStyleLanguage;
+use APP\handler\Handler;
 
 class SignpostingLinksetHandler extends Handler {
 
@@ -55,14 +64,14 @@ class SignpostingLinksetHandler extends Handler {
 	 */
 	protected function _outputLinkset($args, $request, $mode) {
 		$headers	= Array();
-		$request = Application::get()->getRequest();
-		$articleDao = DAORegistry::getDAO('SubmissionDAO');
-		$issueDao	= DAORegistry::getDAO('IssueDAO');
-		$journal	= $request->getJournal();
-		$article	= $articleDao->getById($args[0]);
-		if (empty($article)) return false;
+		$request = Application::get()->getRequest();		
+		$journal	= $request->getJournal();                
+                $articleId = $args[0];
+                $submission = Repo::submission()->get($articleId);
+                
+		if (empty($submission)) return false;
 		$plugin     = PluginRegistry::getPlugin('generic', 'signpostingplugin');
-		$articleId  = $article->getId();
+                
 		switch ($mode) {
 			case 'article' : $anchor = $request->url(null, 'article', 'view', $articleId);
 							 break;
@@ -79,11 +88,10 @@ class SignpostingLinksetHandler extends Handler {
 							  $modeParams['configVarName'],
 							  $modeParams['patternMode'],
 							  $journal,
-							  $article
+							  $submission
 							 );
 		$body = json_encode($this->_buildLinksetBody($headers, $anchor),
 							JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
-		//header('Content-Disposition: attachment; filename="' . $article->getId() . '-linkset.json"');
 		header('Content-Type: application/linkset+json');
 		echo $body;
 	}

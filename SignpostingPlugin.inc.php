@@ -19,7 +19,16 @@
 // Linkset URL example:
 // https://<hostname>/<journal-url/sp-linkset/article/11176
  
-import('lib.pkp.classes.plugins.GenericPlugin');
+
+use APP\core\Application;
+use APP\facades\Repo;
+use PKP\core\PKPString;
+use PKP\facades\Locale;
+use PKP\plugins\PluginRegistry;
+use PKP\plugins\Hook;
+use PKP\db\DAORegistry;
+use PKP\submissionFile\SubmissionFile;
+use APP\plugins\generic\citationStyleLanguage;
 
 define('SIGNPOSTING_MAX_LINKS', 10);
 
@@ -47,7 +56,7 @@ class SignpostingPlugin extends GenericPlugin {
 		if (!Config::getVar('general', 'installed') || defined('RUNNING_UPGRADE')) return true;
 		if ($success && $this->getEnabled($mainContextId)) {
 			// Register callback for the dispatcher
-			HookRegistry::register('LoadHandler', Array($this, 'dispatcher'));
+			Hook::add('LoadHandler', Array($this, 'dispatcher'));
 		}
 		return $success;
 	}
@@ -73,11 +82,7 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param $sourceFile
 	 */
 	public function dispatcher($page, $op) {
-                error_log(print_r($page,true));
-                error_log(print_r($op,true));
-                $request = Application::get()->getRequest();
-		$articleDao = DAORegistry::getDAO('SubmissionDAO');
-		$issueDao = DAORegistry::getDAO('IssueDAO');
+                $request = Application::get()->getRequest();		
 		$context = $request->getContext();
 		$args = $request->getRequestedArgs();
 		$params = $request->getQueryArray();
@@ -120,8 +125,10 @@ class SignpostingPlugin extends GenericPlugin {
 		} else {
 			return false;
 		}
-		$article = $articleDao->getById($args[0]);
-		if (empty($article)) return false;
+                $articleId = $args[0];
+                $submission = Repo::submission()->get($articleId);
+                
+		if (empty($submission)) return false;
 
 		$headers	= Array();
 		$modeParams = $this->getModeParameters($mode);
@@ -133,15 +140,15 @@ class SignpostingPlugin extends GenericPlugin {
 								$configVarName,
 								$patternMode,
 								$context,
-								$article);
+								$submission);
 		}
 		if (count($headers) > SIGNPOSTING_MAX_LINKS) {
 			switch ($mode) {
-				case 'article' : $params = $article->getId();
+				case 'article' : $params = $submission->getId();
 								 break;
-				case 'boundary': $params = Array($article->getId(), $args[1]);
+				case 'boundary': $params = Array($submission->getId(), $args[1]);
 								 break;
-				case 'biblio'  : $params = Array($article->getId(), $params['format']);
+				case 'biblio'  : $params = Array($submission->getId(), $params['format']);
 								 break;
 			}
 			$linksetUrl = $request->url(null,
@@ -248,7 +255,8 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param object $article
 	 */
 	protected function _authorPattern(&$headers, $article) {
-		foreach ($article->getAuthors() as $author) {
+                $authors = $article->getCurrentPublication()->getData('authors');
+		foreach ($authors as $author) {
 			$orcid = $author->getData('orcid');
 			if (!empty($orcid)) {
 				$headers[] = Array('value' => $orcid,
@@ -274,10 +282,9 @@ class SignpostingPlugin extends GenericPlugin {
 								   'rel'   => $rel,
 								   'type'  => $mimeType['contentType']);
 			}
-			$pubIdPlugin = PluginRegistry::loadPlugin('pubIds', 'doi');
-			$pubId = $pubIdPlugin->getPubId($article);
-			if (!empty($pubId)) {
-				$headers[] = Array('value' => $pubIdPlugin->getResolvingURL($context->getId(), $pubId),
+                        $doiObject = $article->getCurrentPublication()->getData('doiObject');
+			if (!empty($doiObject)) {
+				$headers[] = Array('value' => $doiObject->getResolvingURL($context->getId(), $doiObject->getDoi()),
 								   'rel'   => $rel,
 								   'type'  => 'application/vnd.citationstyles.csl+json');
 			}
@@ -340,14 +347,14 @@ class SignpostingPlugin extends GenericPlugin {
 	 * 
 	 */
 	protected function _getCitationFormats() {
+                $request = Application::get()->getRequest();		
+		$context = $request->getContext();
+                $contextId = $context->getId();
 		if(count($this->_citationFormats) < 1){
-			// The DOI plugin is loaded to register the hook: 'CitationStyleLanguage::citation'
-			// Used by 'citationStyleLanguage' Plugin
-			$doi    = PluginRegistry::loadPlugin('pubIds' , 'doi');
 			$plugin = PluginRegistry::loadPlugin('generic', 'citationStyleLanguage');
 			if(!empty($plugin)){
-				$citationStyles = $plugin->getEnabledCitationStyles();
-				$citationDwn = $plugin->getEnabledCitationDownloads();
+				$citationStyles = $plugin->getEnabledCitationStyles($contextId);
+				$citationDwn = $plugin->getEnabledCitationDownloads($contextId);
 				$citationFormats = array_merge($citationStyles, $citationDwn);
 				foreach($citationFormats as $citationFormat){
 					if(array_key_exists('contentType', $citationFormat)){

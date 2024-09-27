@@ -16,7 +16,16 @@
  * @brief Signposting citations handler
  */
 
-import('classes.handler.Handler');
+use APP\core\Application;
+use APP\facades\Repo;
+use PKP\core\PKPString;
+use PKP\facades\Locale;
+use PKP\plugins\PluginRegistry;
+use PKP\plugins\Hook;
+use PKP\db\DAORegistry;
+use PKP\submissionFile\SubmissionFile;
+use APP\plugins\generic\citationStyleLanguage\CitationStyleLanguagePlugin;
+use APP\handler\Handler;
 
 class SignpostingCitationHandler extends Handler {
 
@@ -48,22 +57,21 @@ class SignpostingCitationHandler extends Handler {
 		if (isset($citationFormats[$format])) {
 			$templateMgr = TemplateManager::getManager();
 			$request = Application::get()->getRequest();
-			$articleDao  = DAORegistry::getDAO('SubmissionDAO');
-			$issueDao	 = DAORegistry::getDAO('IssueDAO');
 			$journal	 = $request->getJournal();
-			$article	 = $articleDao->getById($args[0]);
-			if (empty($article)) return false;
-			$issue	     = $issueDao->getBySubmissionId($article->getId());
-			$plugin      = PluginRegistry::loadPlugin('generic', 'citationStyleLanguage');
-			$templateMgr->assign('articleId' , $article->getId());
-			$templateMgr->assign('articleUrl', $request->url(null, 'article', 'view', $article->getId()));
-			$filename    = substr(preg_replace('/[^a-zA-Z0-9_.-]/', '', str_replace(' ', '-', $article->getLocalizedTitle())), 0, 60);
-			$citationString = trim(strip_tags($plugin->getCitation($request, $article, $format, $issue)));
+                        
+                        $articleId = $args[0];
+                        $submission = Repo::submission()->get($articleId);
+			if (empty($submission)) return false;
+			$issue = Repo::issue()->getBySubmissionId($submission->getId());
+			$plugin      = PluginRegistry::getPlugin('generic', 'citationstylelanguageplugin');
+			$templateMgr->assign('articleId' , $submission->getId());
+			$templateMgr->assign('articleUrl', $request->url(null, 'article', 'view', $submission->getId()));
+			$filename    = substr(preg_replace('/[^a-zA-Z0-9_.-]/', '', str_replace(' ', '-', $submission->getLocalizedTitle())), 0, 60);
+			$citationString = trim(strip_tags($plugin->getCitation($request, $submission, $format, $issue)));
 			$citationString = str_replace('\n', "\n", $citationString);
 			header('Content-Disposition: attachment; filename="' . $filename . '.' . $format . '.' . $citationFormats[$format]['fileExtension'] . '"');
 			header('Content-Type: '.$citationFormats[$format]['contentType']);
-			//old implementation
-			//echo trim(html_entity_decode(strip_tags($plugin->getCitation($request, $article, $format, $issue)), ENT_QUOTES, 'UTF-8'));
+
 			echo $citationString;
 		}
 	}
@@ -73,14 +81,14 @@ class SignpostingCitationHandler extends Handler {
 	 * 
 	 */
 	protected function _getCitationFormats() {
+                $request = Application::get()->getRequest();		
+		$context = $request->getContext();
+                $contextId = $context->getId();
 		if(count($this->_citationFormats) < 1){
-			// The DOI plugin is loaded to register the hook: 'CitationStyleLanguage::citation'
-			// Used by 'citationStyleLanguage' Plugin
-			$doi    = PluginRegistry::loadPlugin('pubIds' , 'doi');
-			$plugin = PluginRegistry::loadPlugin('generic', 'citationStyleLanguage');
+			$plugin = PluginRegistry::getPlugin('generic', 'citationstylelanguageplugin');
 			if(!empty($plugin)){
-				$citationStyles = $plugin->getEnabledCitationStyles();
-				$citationDwn = $plugin->getEnabledCitationDownloads();
+				$citationStyles = $plugin->getEnabledCitationStyles($contextId);
+				$citationDwn = $plugin->getEnabledCitationDownloads($contextId);
 				$citationFormats = array_merge($citationStyles, $citationDwn);
 				foreach($citationFormats as $citationFormat){
 					if(array_key_exists('contentType', $citationFormat)){
