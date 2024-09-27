@@ -73,8 +73,6 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @param $sourceFile
 	 */
 	public function dispatcher($page, $op) {
-                error_log(print_r($page,true));
-                error_log(print_r($op,true));
                 $request = Application::get()->getRequest();
 		$articleDao = DAORegistry::getDAO('SubmissionDAO');
 		$issueDao = DAORegistry::getDAO('IssueDAO');
