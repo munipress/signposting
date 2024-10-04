@@ -35,6 +35,8 @@ class SignpostingPlugin extends GenericPlugin {
 	protected $_boundariesConfig  = Array('publication boundary');
 	
 	protected $_citationFormats   = Array();
+        
+        protected $_article;
 
 	/**
 	 * Called as a plugin is registered to the registry
@@ -82,6 +84,10 @@ class SignpostingPlugin extends GenericPlugin {
 		$returnTrue = false;
 		$returnHead = false;
 		$mode		= false;
+                
+                $article = $articleDao->getById($args[0]);
+                $this->_article = $article;
+                
 		if ($op[0] == 'sp-linkset') {
 			$this->import('pages/SignpostingLinksetHandler');
 			define('HANDLER_CLASS', 'SignpostingLinksetHandler');
@@ -110,7 +116,7 @@ class SignpostingPlugin extends GenericPlugin {
 		// Changed to include the PDF preview page
 		// } elseif ($op[0] == 'article' && $op[1] == 'download') {
 		} elseif (($op[0] == 'article' && $op[1] == 'download') || ($op[0] == 'article' && $op[1] == 'view' && count($args) < 3)) {
-			if ($this->checkBoundary($args[0])) {
+			if ($this->checkBoundary($args[1])) {
 				$mode = 'boundary';
 			} else {
 				return false;
@@ -118,7 +124,8 @@ class SignpostingPlugin extends GenericPlugin {
 		} else {
 			return false;
 		}
-		$article = $articleDao->getById($args[0]);
+		
+                
 		if (empty($article)) return false;
 
 		$headers	= Array();
@@ -199,11 +206,14 @@ class SignpostingPlugin extends GenericPlugin {
 	 * @return bool
 	 */
 	public function checkBoundary($galleyId) {
-		$articleDao = DAORegistry::getDAO('ArticleGalleyDAO');
-		$galley	 = $articleDao->getById($galleyId);
-		if (!empty($galley)) {
-			return true;
-		}
+                $publication = $this->_article->getCurrentPublication();
+                $galleys = (array) $publication->getData('galleys');
+                foreach ($galleys as $galley) {
+                        if ($galley->getBestGalleyId() == $galleyId) {
+                                return true;
+                                break;
+                        }
+                }
 		return false;
 	}
 
